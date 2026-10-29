@@ -1,0 +1,15 @@
+package: community.lazycat.app.syncclipboard
+version: 3.3.3
+name: SyncClipboard
+description: Self-hosted clipboard synchronization server for SyncClipboard clients.
+min_os_version: "1.5.0"
+homepage: https://github.com/Jeric-X/SyncClipboard
+author: Jeric-X
+license: MIT
+locales:
+  zh:
+    name: SyncClipboard
+    description: 跨设备剪贴板同步服务端，可与 SyncClipboard 桌面和手机客户端配合使用。
+  en:
+    name: SyncClipboard
+    description: Self-hosted clipboard synchronization server for SyncClipboard clients.

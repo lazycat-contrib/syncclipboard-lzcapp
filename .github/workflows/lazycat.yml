@@ -1,0 +1,59 @@
+name: Verify and publish SyncClipboard
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate temporary test password
+        run: |
+          value=$(openssl rand -hex 24)
+          echo "::add-mask::$value"
+          echo "SYNCCLIPBOARD_PASSWORD=$value" >> "$GITHUB_ENV"
+      - name: Start exact upstream image with persistent data
+        run: |
+          set -euo pipefail
+          docker volume create syncclipboard-smoke
+          docker run --detach --name syncclipboard --publish 127.0.0.1:15033:5033 --env SYNCCLIPBOARD_USERNAME=smoke-user --env SYNCCLIPBOARD_PASSWORD --mount type=volume,source=syncclipboard-smoke,target=/app/data jericx/syncclipboard-server:v3.3.3@sha256:4fe1486f176679e18fbcd2d220d19d21c4d19ce76ef63d92c4a00e28e9314eca
+      - name: Verify authentication and text synchronization
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 25 --retry-all-errors --retry-delay 2 --max-time 10 --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/api/version
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:15033/SyncClipboard.json)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --user smoke-user:wrong-password http://127.0.0.1:15033/SyncClipboard.json)" = 401
+          text=lazycat-syncclipboard-smoke
+          hash=$(printf '%s' "$text" | sha256sum | cut -d ' ' -f 1)
+          printf '{"Type":"Text","Hash":"%s","Text":"%s","HasData":false}' "$hash" "$text" > profile.json
+          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --header 'Content-Type: application/json' --request PUT --data-binary @profile.json http://127.0.0.1:15033/SyncClipboard.json
+          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/SyncClipboard.json | jq -e '(.Text // .text) == "lazycat-syncclipboard-smoke"'
+      - name: Verify file synchronization and restart persistence
+        run: |
+          set -euo pipefail
+          printf 'syncclipboard-file-smoke' > sample.txt
+          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --request PUT --data-binary @sample.txt http://127.0.0.1:15033/file/sample.txt
+          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/file/sample.txt -o downloaded.txt
+          cmp sample.txt downloaded.txt
+          docker restart syncclipboard
+          curl --fail --silent --show-error --retry 25 --retry-all-errors --retry-delay 2 --max-time 10 --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/SyncClipboard.json | jq -e '(.Text // .text) == "lazycat-syncclipboard-smoke"'
+          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/file/sample.txt -o restored.txt
+          cmp sample.txt restored.txt
+          echo 'Authentication, text/file round trips and restart persistence verified.'
+      - name: Remove test resources
+        if: always()
+        run: |
+          docker rm -f syncclipboard || true
+          docker volume rm syncclipboard-smoke || true
+  lazycat:
+    needs: smoke
+    uses: ca-x/lazycat-github-action/.github/workflows/lazycat.yml@v1
+    with:
+      operation: auto
+      config: .github/lazycat-action.yml
+      versioned-release-asset: true
+    secrets:
+      APPSTORE_URL: ${{ secrets.APPSTORE_URL }}
+      APPSTORE_TOKEN: ${{ secrets.APPSTORE_TOKEN }}
+      PRIVATE_STORE_GROUP_CODES: ${{ secrets.PRIVATE_STORE_GROUP_CODES }}

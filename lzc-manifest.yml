@@ -1,0 +1,50 @@
+application:
+  subdomain: syncclipboard
+  multi_instance: false
+  entries:
+    - id: main
+      title: Setup guide
+      path: /help
+  upstreams:
+    - location: /help
+      backend: file:///lzcapp/pkg/content/help.html
+    - location: /
+      backend: http://syncclipboard:5033/
+  # Native clients cannot complete an interactive LazyCat login.
+  # These routes retain the upstream server's mandatory HTTP Basic authentication.
+  public_path:
+    - /
+    - /SyncClipboard.json
+    - /file
+    - /file/*
+    - /api/*
+    - /SyncClipboardHub
+    - /SyncClipboardHub/*
+  injects:
+    - id: authenticated-browser-basic-auth
+      on: request
+      auth_required: true
+      when:
+        - /api/*
+        - /SyncClipboard.json
+        - /file
+        - /file/*
+        - /SyncClipboardHub
+        - /SyncClipboardHub/*
+      do: |
+        ctx.headers.set("Authorization", {{ printf "Basic %s" (printf "%s:%s" .U.login_user .U.login_password | b64enc) | toJson }});
+services:
+  syncclipboard:
+    # upstream: docker.io/jericx/syncclipboard-server:v3.3.3
+    image: docker.1ms.run/jericx/syncclipboard-server:v3.3.3
+    environment:
+      - {{ printf "SYNCCLIPBOARD_USERNAME=%s" .U.login_user | quote }}
+      - {{ printf "SYNCCLIPBOARD_PASSWORD=%s" .U.login_password | quote }}
+    binds:
+      - /lzcapp/var/data:/app/data
+usage: |
+  这是 SyncClipboard 同步服务端；点击图标打开配置说明。
+  在客户端中填写本应用的 HTTPS 根地址，以及部署参数中的同步用户名和密码。
+  API 允许原生客户端直接连接，但仍必须通过服务端 HTTP Basic 认证；不会公开剪贴板内容。
+  所有客户端共用本实例的一组同步凭据，请只给可信设备使用。请勿在用户名或密码中使用冒号。
+  记录和文件持久化于应用内部数据目录；卸载前请备份。

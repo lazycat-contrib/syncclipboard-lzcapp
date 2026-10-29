@@ -1,0 +1,21 @@
+params:
+  - id: login_user
+    type: string
+    name: Sync username
+    description: Shared native-client username. Do not use a colon.
+    default_value: lazycat
+    optional: false
+  - id: login_password
+    type: secret
+    name: Sync password
+    description: Shared native-client password. Keep the random value and do not use a colon.
+    default_value: "$random(len=24)"
+    optional: false
+locales:
+  zh:
+    login_user:
+      name: 同步用户名
+      description: 在所有客户端填写此用户名，请勿使用冒号。
+    login_password:
+      name: 同步密码
+      description: 请保留自动生成的随机密码，并在客户端填写；请勿使用冒号。

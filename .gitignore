@@ -1,0 +1,6 @@
+dist/
+*.lpk
+profile.json
+sample.txt
+downloaded.txt
+restored.txt
