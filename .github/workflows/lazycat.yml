@@ -21,28 +21,29 @@ jobs:
       - name: Verify authentication and text synchronization
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 25 --retry-all-errors --retry-delay 2 --max-time 10 --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/api/version
+          curl --fail-with-body --silent --show-error --retry 25 --retry-all-errors --retry-delay 2 --max-time 10 --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/api/version
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:15033/SyncClipboard.json)" = 401
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' --user smoke-user:wrong-password http://127.0.0.1:15033/SyncClipboard.json)" = 401
           text=lazycat-syncclipboard-smoke
           hash=$(printf '%s' "$text" | sha256sum | cut -d ' ' -f 1)
           printf '{"Type":"Text","Hash":"%s","Text":"%s","HasData":false}' "$hash" "$text" > profile.json
-          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --header 'Content-Type: application/json' --request PUT --data-binary @profile.json http://127.0.0.1:15033/SyncClipboard.json
-          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/SyncClipboard.json | jq -e '(.Text // .text) == "lazycat-syncclipboard-smoke"'
+          curl --fail-with-body --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --header 'Content-Type: application/json' --request PUT --data-binary @profile.json http://127.0.0.1:15033/SyncClipboard.json
+          curl --fail-with-body --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/SyncClipboard.json | jq -e '(.Text // .text) == "lazycat-syncclipboard-smoke"'
       - name: Verify transferred-text file and restart persistence
         run: |
           set -euo pipefail
           printf 'syncclipboard-file-smoke' > sample.txt
-          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --request PUT --data-binary @sample.txt http://127.0.0.1:15033/file/sample.txt
+          curl --fail-with-body --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --request PUT --data-binary @sample.txt http://127.0.0.1:15033/file/sample.txt
+          echo "Checking transferred-text metadata commit"
           hash=$(sha256sum sample.txt | cut -d ' ' -f 1)
           size=$(wc -c < sample.txt)
           printf '{"Type":"Text","Hash":"%s","Text":"syncclipboard-file-smoke","HasData":true,"DataName":"sample.txt","TransferDataHash":"%s","Size":%s}' "$hash" "$hash" "$size" > file-profile.json
-          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --header 'Content-Type: application/json' --request PUT --data-binary @file-profile.json http://127.0.0.1:15033/SyncClipboard.json
-          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/file/sample.txt -o downloaded.txt
+          curl --fail-with-body --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" --header 'Content-Type: application/json' --request PUT --data-binary @file-profile.json http://127.0.0.1:15033/SyncClipboard.json
+          curl --fail-with-body --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/file/sample.txt -o downloaded.txt
           cmp sample.txt downloaded.txt
           docker restart syncclipboard
-          curl --fail --silent --show-error --retry 25 --retry-all-errors --retry-delay 2 --max-time 10 --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/SyncClipboard.json | jq -e '(.Text // .text) == "syncclipboard-file-smoke"'
-          curl --fail --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/file/sample.txt -o restored.txt
+          curl --fail-with-body --silent --show-error --retry 25 --retry-all-errors --retry-delay 2 --max-time 10 --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/SyncClipboard.json | jq -e '(.Text // .text) == "syncclipboard-file-smoke"'
+          curl --fail-with-body --silent --show-error --user "smoke-user:$SYNCCLIPBOARD_PASSWORD" http://127.0.0.1:15033/file/sample.txt -o restored.txt
           cmp sample.txt restored.txt
           echo 'Authentication, text and transferred-text file round trips, and restart persistence verified.'
       - name: Remove test resources
